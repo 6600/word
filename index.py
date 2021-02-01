@@ -25,17 +25,24 @@ appListObj = {
 def connectDB():
   return pymysql.connect(host=config["server"], port=config["port"], user=config["user"], password=config["password"], db=config["name"], charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
 
+wordIndex = 0
 @app.route("/getData")
 def getData():
-    connection = connectDB()
-    with connection.cursor() as cursor:
-        # 执行sql语句，进行查询
-        sql = "select * from `word`"
-        print(sql)
-        cursor.execute(sql)
-        result = cursor.fetchall()
-        connection.commit()
-        return json.dumps(result)
+  global wordIndex
+  connection = connectDB()
+  with connection.cursor() as cursor:
+    # 执行sql语句，进行查询
+    sql = "select * from `word`"
+    print(sql)
+    cursor.execute(sql)
+    result = cursor.fetchall()
+    connection.commit()
+    if (len(result) <= wordIndex):
+      wordIndex = 0
+    returnData = result[wordIndex]
+    wordIndex = wordIndex + 1
+    
+    return json.dumps(returnData)
 
 @app.route("/getUserInfo")
 def getUserInfo():
@@ -50,21 +57,23 @@ def getUserInfo():
   userInfo = response2.json()
   connection = pymysql.connect(host=config["server"], port=config["port"], user=config["user"], password=config["password"], db=config["name"], charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
   with connection.cursor() as cursor:
-      # 执行sql语句，进行查询
-      sql = "select * from `user` where openid='" + userInfo['openid'] + "'"
+    # 执行sql语句，进行查询
+    sql = "select * from `user` where openid='" + userInfo['openid'] + "'"
+    # print(sql)
+    cursor.execute(sql)
+    # 获取查询结果
+    result = cursor.fetchone()
+    connection.commit()
+    if (not result):
+      result = ''
+      sql = "INSERT INTO `user` ( openid, jointime, value) VALUES ( '%s', '%s', '%s')" % (userInfo['openid'], str(datetime.datetime.now()), '')
       # print(sql)
       cursor.execute(sql)
-      # 获取查询结果
-      result = cursor.fetchone()
       connection.commit()
-      if (not result):
-        sql = "INSERT INTO `user` ( openid, jointime, value) VALUES ( '%s', '%s', '%s')" % (userInfo['openid'], str(datetime.datetime.now()), '')
-        # print(sql)
-        cursor.execute(sql)
-        connection.commit()
-      connection.close()
-  print(userInfo)
-  return userInfo
+    connection.close()
+    userInfo['userData'] = result
+    print(userInfo)
+    return userInfo
 
 
 app.run(host='0.0.0.0', port=8100, debug=True)
